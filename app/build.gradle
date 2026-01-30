@@ -1,0 +1,33 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace = "com.mathsoft.cgraphicsapp"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 21
+        targetSdk = 28
+
+        // Configure ABI splits to reduce APK size
+        // ndk {
+        //     abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+        // }
+    }
+
+    // Configure CMake for native code compilation
+    // externalNativeBuild {
+    //     cmake {
+    //         path = "src/main/cpp/CMakeLists.txt"
+    //         version = "3.22.1"
+    //     }
+    // }
+}
+
+
+dependencies {
+    def core_version = "1.17.0"
+
+    implementation "androidx.core:core:$core_version"
+}
