@@ -1,32 +1,32 @@
 # CGraphicsApp
 
-**CGraphicsApp** es una aplicación Android orientada a la **compilación y ejecución dinámica de código nativo en C** directamente en el dispositivo. Permite seleccionar archivos fuente (`.c`), compilarlos en tiempo de ejecución mediante **Clang**, generar bibliotecas compartidas (`.so`) y cargarlas dinámicamente para ejecutar un **motor gráfico nativo** sobre un `SurfaceView`.
+**CGraphicsApp** is an Android application focused on the **dynamic compilation and execution of native C code** directly on the device. It allows selecting source files (`.c`), compiling them at runtime using **Clang**, generating shared libraries (`.so`), and dynamically loading them to run a **native graphics engine** on a `SurfaceView`.
 
-El proyecto está diseñado como **herramienta experimental / educativa**.
-
----
-
-## Objetivo del proyecto
-
-* Proveer un **entorno autosuficiente** en Android para:
-
-  * Compilar código C nativo en el propio dispositivo.
-  * Generar bibliotecas compartidas (`.so`) sin depender de ADB ni de un host externo.
-  * Cargar dinámicamente dichas bibliotecas usando `System.load`.
-  * Ejecutar lógica gráfica nativa mediante JNI y `Surface`.
-
-* Explorar:
-
-  * Carga dinámica de código nativo.
-  * Interacción Java ↔ JNI ↔ OpenGL/EGL (lado nativo).
-  * Gestión de permisos de almacenamiento en Android moderno.
-  * Instalación “embebida” de toolchains (Clang) desde assets.
+The project is designed as an **experimental/educational tool**.
 
 ---
 
-## Arquitectura general
+## Project Objective
 
-La aplicación se divide en **tres responsabilidades principales**, cada una encapsulada en una `Activity`:
+* Provide a **self-contained environment** on Android for:
+
+  * Compiling native C code on the device itself.
+  * Generating shared libraries (`.so`) without depending on ADB or an external host.
+  * Dynamically loading these libraries using `System.load`.
+  * Executing native graphics logic through JNI and `Surface`.
+
+* Explore:
+
+  * Dynamic loading of native code.
+  * Java ↔ JNI ↔ OpenGL/EGL interaction (native side).
+  * Storage permission management on modern Android.
+  * "Embedded" installation of toolchains (Clang) from assets.
+
+---
+
+## General Architecture
+
+The application is divided into **three main responsibilities**, each encapsulated in an `Activity`:
 
 ```
 MainActivity
@@ -34,99 +34,99 @@ MainActivity
       └── RenderActivity
 ```
 
-### Flujo de ejecución
+### Execution Flow
 
 1. **MainActivity**
 
-   * Verifica si el compilador Clang está instalado.
-   * Instala el compilador copiándolo desde assets si es necesario.
-   * Muestra información del sistema y del entorno de compilación.
+   * Checks if the Clang compiler is installed.
+   * Installs the compiler by copying it from assets if necessary.
+   * Displays system and compilation environment information.
 
 2. **CompilerActivity**
 
-   * Permite seleccionar un archivo fuente en C desde el almacenamiento.
-   * Compila el archivo usando Clang.
-   * Genera una librería `.so` en almacenamiento interno o externo.
-   * Expone la salida del compilador (stdout / stderr).
-   * Habilita la ejecución del motor gráfico compilado.
+   * Allows selecting a C source file from storage.
+   * Compiles the file using Clang.
+   * Generates a `.so` library in internal or external storage.
+   * Exposes compiler output (stdout/stderr).
+   * Enables execution of the compiled graphics engine.
 
 3. **RenderActivity**
 
-   * Carga dinámicamente la librería `.so`.
-   * Inicializa el motor gráfico nativo.
-   * Proporciona un `Surface` válido para rendering.
-   * Controla el ciclo de vida del rendering.
+   * Dynamically loads the `.so` library.
+   * Initializes the native graphics engine.
+   * Provides a valid `Surface` for rendering.
+   * Controls the rendering lifecycle.
 
 ---
 
-## Componentes principales
+## Main Components
 
 ### MainActivity
 
-Responsabilidad:
+Responsibility:
 
-* Bootstrap del entorno de compilación.
+* Compilation environment bootstrap.
 
-Funciones clave:
+Key Functions:
 
-* Detección del ABI del dispositivo.
-* Instalación del compilador mediante `ClangCompilerManager`.
-* Visualización de la estructura de archivos del compilador.
-* Control de estado de instalación.
+* Device ABI detection.
+* Compiler installation via `ClangCompilerManager`.
+* Visualization of compiler file structure.
+* Installation status control.
 
-Aspectos técnicos relevantes:
+Relevant Technical Aspects:
 
-* Uso de `AsyncTask` para operaciones I/O intensivas.
-* Copia progresiva con callback para feedback visual.
+* Use of `AsyncTask` for I/O-intensive operations.
+* Progressive copying with callback for visual feedback.
 
 ---
 
 ### CompilerActivity
 
-Responsabilidad:
+Responsibility:
 
-* Compilación de código fuente C.
+* C source code compilation.
 
-Funciones clave:
+Key Functions:
 
-* Selección de archivos mediante `ACTION_OPEN_DOCUMENT`.
-* Copia segura del archivo seleccionado a almacenamiento interno temporal.
-* Invocación del compilador nativo.
-* Manejo de permisos de lectura/escritura.
-* Presentación detallada del resultado de compilación.
+* File selection via `ACTION_OPEN_DOCUMENT`.
+* Safe copying of selected file to temporary internal storage.
+* Native compiler invocation.
+* Read/write permission handling.
+* Detailed presentation of compilation results.
 
-Salida de compilación:
+Compilation Output:
 
-* Estado (éxito / error).
-* Ruta absoluta del `.so` generado.
-* Tamaño del binario.
-* Salida textual del compilador.
+* Status (success/error).
+* Absolute path of generated `.so`.
+* Binary size.
+* Compiler text output.
 
-Decisiones técnicas:
+Technical Decisions:
 
-* El archivo fuente nunca se compila directamente desde un `Uri`.
-* El `.so` puede almacenarse:
+* Source file is never compiled directly from a `Uri`.
+* The `.so` can be stored:
 
-  * En almacenamiento interno privado (default).
-  * En almacenamiento externo (`/mis_so/`) bajo consentimiento explícito.
-* Se desacopla compilación y ejecución (no se ejecuta automáticamente).
+  * In private internal storage (default).
+  * In external storage (`/mis_so/`) with explicit consent.
+* Compilation and execution are decoupled (not executed automatically).
 
 ---
 
 ### RenderActivity
 
-Responsabilidad:
+Responsibility:
 
-* Ejecución del motor gráfico nativo.
+* Native graphics engine execution.
 
-Funciones clave:
+Key Functions:
 
-* Carga dinámica del `.so` mediante `System.load`.
-* Validación explícita de existencia del archivo.
-* Creación de UI completamente programática (sin XML).
-* Gestión del ciclo de vida del `SurfaceView`.
+* Dynamic loading of `.so` via `System.load`.
+* Explicit validation of file existence.
+* Fully programmatic UI creation (no XML).
+* `SurfaceView` lifecycle management.
 
-Interfaz JNI esperada en la librería:
+Expected JNI Interface in Library:
 
 ```c
 JNIEXPORT void JNICALL
@@ -136,11 +136,11 @@ JNIEXPORT void JNICALL
 Java_com_mathsoft_cgraphicsapp_RenderActivity_stopRendering(JNIEnv* env, jobject obj);
 ```
 
-Aspectos técnicos:
+Technical Aspects:
 
-* El `Surface` se pasa directamente al código nativo.
-* No se fuerza el cierre del rendering en `onPause`.
-* El rendering se detiene de forma explícita en:
+* The `Surface` is passed directly to native code.
+* Rendering closure is not forced in `onPause`.
+* Rendering stops explicitly in:
 
   * `surfaceDestroyed`
   * `onDestroy`
@@ -148,9 +148,9 @@ Aspectos técnicos:
 
 ---
 
-## Permisos y almacenamiento
+## Permissions and Storage
 
-### Permisos declarados
+### Declared Permissions
 
 ```xml
 READ_EXTERNAL_STORAGE
@@ -158,38 +158,38 @@ WRITE_EXTERNAL_STORAGE
 MANAGE_EXTERNAL_STORAGE
 ```
 
-Justificación:
+Justification:
 
-* Selección de archivos fuente desde almacenamiento externo.
-* Escritura opcional del `.so` fuera del sandbox de la app.
-* Compatibilidad con Android 11+ **(EXPERIMENTAL)**.
+* Selection of source files from external storage.
+* Optional writing of `.so` outside the app sandbox.
+* Compatibility with Android 11+ **(EXPERIMENTAL)**.
 
-Notas:
+Notes:
 
-* `requestLegacyExternalStorage=true` se utiliza para compatibilidad.
-* No es un proyecto orientado a Play Store (restricciones conocidas).
+* `requestLegacyExternalStorage=true` is used for compatibility.
+* Not a Play Store-oriented project (known restrictions).
 
 ---
 
-## Configuración del proyecto
+## Project Configuration
 
 ### SDK
 
 * `minSdk`: 21 (Android 5.0)
-* `targetSdk`: 28 (Para evitar restricciones del protocolo W^X de SELinux)
+* `targetSdk`: 28 (To avoid SELinux W^X protocol restrictions)
 * `compileSdk`: 36
 
-Razonamiento:
+Rationale:
 
-* Experimentación con dispositivos antiguos (Android 5.0 en adelante).
-* Permitir ABI modernos sin romper compatibilidad (EXPERIMENTAL).
-* Evitar restricciones agresivas de almacenamiento introducidas en APIs modernas.
+* Experimentation with older devices (Android 5.0 onwards).
+* Allow modern ABIs without breaking compatibility (EXPERIMENTAL).
+* Avoid aggressive storage restrictions introduced in modern APIs.
 
 ---
 
-### Dependencias
+### Dependencies
 
-Dependencias mínimas, sin librerías innecesarias:
+Minimal dependencies, no unnecessary libraries:
 
 ```gradle
 androidx.core:core:1.17.0
@@ -197,50 +197,49 @@ androidx.core:core:1.17.0
 
 ---
 
-## Limitaciones y posibles problemas de seguridad.
+## Limitations and Potential Security Issues
 
-* Uso de `AsyncTask` (API obsoleta, pero funcional para API 21–28).
-* No hay sandboxing del código nativo ejecutado.
-* La app pide permisos de ficheros de forma masiva.
-* Un `.so` malicioso puede:
+* Use of `AsyncTask` (deprecated API, but functional for API 21–28).
+* No sandboxing of executed native code.
+* The app requests file permissions broadly.
+* A malicious `.so` can:
 
-  * Crashear la app.
-  * Bloquear el rendering.
-* No hay validación semántica del código C.
-* No hay editor de código C.
-* Solo se puede compilar un fichero de código fuente en C (Sin ficheros de cabecera que no sean los del toolchain del NDK de android r25c y los del llvm-clang/lib/clang/17/include ).
-* No existe aislamiento por proceso (no `isolatedProcess`).
+  * Crash the app.
+  * Block rendering.
+* No semantic validation of C code.
+* No C code editor.
+* Only one C source file can be compiled (without header files other than those from Android NDK r25c toolchain and llvm-clang/lib/clang/17/include).
+* No process isolation (no `isolatedProcess`).
 
-Estas limitaciones son **conscientes y aceptadas** dado el carácter experimental del proyecto.
-
----
-
-## Casos de uso previstos
-
-* Pruebas de motores gráficos nativos.
-* Experimentación con JNI y OpenGL ES.
-* Desarrollo educativo de toolchains móviles.
-* Prototipos de compiladores embebidos.
-* Investigación sobre ejecución dinámica en Android.
+These limitations are **consciously accepted** given the experimental nature of the project.
 
 ---
 
-# LLVM-Clang 17 para Android (Redistribución Optimizada para Android)
+## Intended Use Cases
 
-Este proyecto hace uso del LLVM-Clang 17 optimizado para Android y uso del sysroot optimizado del NDK r25c.
+* Native graphics engine testing.
+* Experimentation with JNI and OpenGL ES.
+* Educational development of mobile toolchains.
+* Embedded compiler prototypes.
+* Research on dynamic execution in Android.
 
-## Nota importante
-Este repositorio NO contiene modificaciones al código fuente de LLVM-Clang o del NDK r25c.
-Solo es una redistribución con optimización de espacio.
+---
 
-## Versión base
-- LLVM-Clang 17 (oficial)
-- Android NDK r25c (Sólo el sysroot)
+# LLVM-Clang 17 for Android (Optimized Redistribution for Android)
 
-## Optimizaciones realizadas
-- Eliminación de herramientas innecesarias (solo se dejo el clang-17 y ld.lld)
-- Eliminación del directorio include redundante
-- Limpieza de librerías para arquitectura específica
-- Sysroot reducido a API 21 únicamente
-- Eliminación de soporte C++ del sysroot
+This project uses LLVM-Clang 17 optimized for Android and the optimized sysroot from NDK r25c.
 
+## Important Note
+This repository does NOT contain modifications to the LLVM-Clang or NDK r25c source code.
+It is only a redistribution with space optimization.
+
+## Base Version
+- LLVM-Clang 17 (official)
+- Android NDK r25c (sysroot only)
+
+## Optimizations Performed
+- Removal of unnecessary tools (only clang-17 and ld.lld were kept)
+- Removal of redundant include directory
+- Library cleanup for specific architecture
+- Sysroot reduced to API 21 only
+- Removal of C++ support from sysroot
