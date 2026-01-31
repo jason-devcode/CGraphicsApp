@@ -56,6 +56,9 @@ public class MainActivity extends Activity {
             compileButton.setEnabled(true);
             Toast.makeText(this, "Compilador disponible", Toast.LENGTH_SHORT).show();
             displayCompilerFiles();
+            
+            Intent intent = new Intent(MainActivity.this, CompilerActivity.class);
+            startActivity(intent);
         }
     }
 
@@ -131,6 +134,8 @@ public class MainActivity extends Activity {
                     Toast.makeText(MainActivity.this, "Instalación exitosa", Toast.LENGTH_SHORT).show();
                     compileButton.setEnabled(true);
                     displayCompilerFiles();
+                    Intent intent = new Intent(MainActivity.this, CompilerActivity.class);
+                    startActivity(intent);
                 } else {
                     statusText.setText("✗ Error al instalar compilador");
                     Toast.makeText(MainActivity.this, "Error en la instalación", Toast.LENGTH_LONG).show();

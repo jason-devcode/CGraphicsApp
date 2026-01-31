@@ -30,11 +30,11 @@ public class NativeCompiler {
      */
     public CompilationResult compile(File sourceFile, String outputName, boolean saveToExternalStorage) {
         if (!compilerManager.isCompilerInstalled()) {
-            return new CompilationResult(false, "Compilador no instalado", "");
+            return new CompilationResult(false, "Compilador no instalado", "", null);
         }
 
         if (!sourceFile.exists() || !sourceFile.canRead()) {
-            return new CompilationResult(false, "No se puede leer el archivo fuente", "");
+            return new CompilationResult(false, "No se puede leer el archivo fuente", "", null);
         }
 
         File compilerDir = compilerManager.getCompilerDirectory();
@@ -45,7 +45,7 @@ public class NativeCompiler {
         if (clangBinary == null || !clangBinary.exists()) {
             String error = "Binario clang no encontrado en: " + 
                           new File(compilerDir, "bin").getAbsolutePath();
-            return new CompilationResult(false, error, "");
+            return new CompilationResult(false, error, "", null);
         }
 
         Log.d(TAG, "Using clang binary: " + clangBinary.getAbsolutePath());
@@ -53,7 +53,7 @@ public class NativeCompiler {
         // Preparar directorio temporal
         File tmpDir = prepareTempDirectory();
         if (tmpDir == null) {
-            return new CompilationResult(false, "No se pudo crear directorio temporal", "");
+            return new CompilationResult(false, "No se pudo crear directorio temporal", "", null);
         }
 
         // Preparar archivo de salida
@@ -62,7 +62,7 @@ public class NativeCompiler {
         if (outputFile == null) {
             return new CompilationResult(false, 
                 "No se pudo crear el directorio de salida. " +
-                "Verifica los permisos de almacenamiento.", "");
+                "Verifica los permisos de almacenamiento.", "", null);
         }
 
         // IMPORTANTE: Eliminar archivo .so anterior si existe
@@ -363,7 +363,7 @@ public class NativeCompiler {
 
         String message = success ? "Compilación exitosa" : "Error de compilación";
         return new CompilationResult(success, message, output.toString(), 
-                                    success ? outputFile.getAbsolutePath() : null);
+                                    success ? outputFile.getAbsolutePath() : null, command);
     }
 
     /**
@@ -374,16 +374,22 @@ public class NativeCompiler {
         private final String message;
         private final String output;
         private final String outputPath;
+        private final List<String> command;
 
-        public CompilationResult(boolean success, String message, String output) {
-            this(success, message, output, null);
+        public CompilationResult(boolean success, String message, String output, List<String> command) {
+            this.success = success;
+            this.message = message;
+            this.output = output;
+            this.outputPath = "";
+            this.command = command;
         }
 
-        public CompilationResult(boolean success, String message, String output, String outputPath) {
+        public CompilationResult(boolean success, String message, String output, String outputPath, List<String> command) {
             this.success = success;
             this.message = message;
             this.output = output;
             this.outputPath = outputPath;
+            this.command = command;
         }
 
         public boolean isSuccess() {
@@ -400,6 +406,14 @@ public class NativeCompiler {
 
         public String getOutputPath() {
             return outputPath;
+        }
+
+        public String getCommand() {
+            String out = "";
+            for( String arg : command ) {
+                out += arg + " ";
+            }
+            return out;
         }
     }
 }

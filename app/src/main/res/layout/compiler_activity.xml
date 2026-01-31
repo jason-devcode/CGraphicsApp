@@ -24,8 +24,22 @@
             android:layout_height="wrap_content"
             android:text="Compila archivos .c a bibliotecas .so nativas para Android"
             android:textSize="14sp"
-            android:paddingBottom="24dp"
+            android:paddingBottom="16dp"
             android:textColor="#757575" />
+
+        <!-- Indicador de estado de cambios -->
+        <TextView
+            android:id="@+id/change_status_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CAMBIOS DETECTADOS"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:padding="12dp"
+            android:background="#FFF3E0"
+            android:textColor="#FF9800"
+            android:visibility="gone"
+            android:layout_marginBottom="16dp" />
 
         <!-- Sección de selección de archivo -->
         <LinearLayout
@@ -136,7 +150,7 @@
                 android:id="@+id/execute_button"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="▶️ EJECUTAR MOTOR GRÁFICO"
+                android:text="▶ EJECUTAR MOTOR GRÁFICO"
                 android:textSize="16sp"
                 android:padding="14dp"
                 android:enabled="false"
@@ -189,6 +203,16 @@
             </ScrollView>
 
         </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💡 Tip: Los cambios se detectan automáticamente. La librería se carga en un proceso separado que se limpia al salir."
+            android:textSize="12sp"
+            android:paddingTop="16dp"
+            android:textColor="#757575"
+            android:textStyle="italic" />
+
     </LinearLayout>
 
 </ScrollView>

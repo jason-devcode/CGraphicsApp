@@ -20,6 +20,7 @@ public class RenderActivity extends Activity {
     private static final String TAG = "RenderActivity";
     public static final String EXTRA_SO_PATH = "so_path";
     public static final String EXTRA_SO_NAME = "so_name";
+    public static final String EXTRA_IS_TEMPORARY = "is_temporary";
 
     private SurfaceView surfaceView;
     private TextView infoText;
@@ -27,6 +28,7 @@ public class RenderActivity extends Activity {
     
     private String soPath;
     private String soName;
+    private boolean isTemporary;
     private boolean libraryLoaded = false;
     private boolean renderingActive = false;
 
@@ -42,12 +44,17 @@ public class RenderActivity extends Activity {
         Intent intent = getIntent();
         soPath = intent.getStringExtra(EXTRA_SO_PATH);
         soName = intent.getStringExtra(EXTRA_SO_NAME);
+        isTemporary = intent.getBooleanExtra(EXTRA_IS_TEMPORARY, false);
 
         if (soPath == null || soName == null) {
             Toast.makeText(this, "Error: No se especificó la librería", Toast.LENGTH_LONG).show();
             finish();
             return;
         }
+
+        Log.d(TAG, "SO Path: " + soPath);
+        Log.d(TAG, "SO Name: " + soName);
+        Log.d(TAG, "Is Temporary: " + isTemporary);
 
         setupUI();
         loadNativeLibrary();
@@ -103,13 +110,16 @@ public class RenderActivity extends Activity {
     private void loadNativeLibrary() {
         try {
             Log.d(TAG, "Intentando cargar librería: " + soPath);
-            infoText.setText("Cargando: " + soName + "\n" + soPath);
+            infoText.setText("Cargando: " + soName + "\n" + soPath +
+                (isTemporary ? "\n(Copia temporal)" : ""));
 
             // Verificar que el archivo existe
             File soFile = new File(soPath);
             if (!soFile.exists()) {
                 throw new Exception("El archivo .so no existe");
             }
+
+            Log.d(TAG, "Archivo existe, tamaño: " + soFile.length() + " bytes");
 
             // Cargar la librería
             System.load(soPath);
@@ -231,11 +241,26 @@ public class RenderActivity extends Activity {
         }
     }
 
+    /**
+     * Elimina el archivo .so temporal si fue creado
+     */
+    private void deleteTemporarySo() {
+        if (isTemporary && soPath != null) {
+            File tempFile = new File(soPath);
+            if (tempFile.exists()) {
+                if (tempFile.delete()) {
+                    Log.d(TAG, "Archivo .so temporal eliminado: " + soPath);
+                } else {
+                    Log.w(TAG, "No se pudo eliminar el archivo .so temporal: " + soPath);
+                }
+            }
+        }
+    }
+
     @Override
     protected void onPause() {
         super.onPause();
         Log.d(TAG, "onPause");
-        // No detenemos el rendering en onPause para que continúe en background
     }
 
     @Override
@@ -248,6 +273,10 @@ public class RenderActivity extends Activity {
     protected void onDestroy() {
         Log.d(TAG, "onDestroy");
         stopRenderingIfActive();
+        
+        // Eliminar archivo temporal si existe
+        deleteTemporarySo();
+        
         super.onDestroy();
     }
 
@@ -255,6 +284,10 @@ public class RenderActivity extends Activity {
     public void onBackPressed() {
         // Detener rendering antes de salir
         stopRenderingIfActive();
+        
+        // Eliminar archivo temporal si existe
+        deleteTemporarySo();
+        
         super.onBackPressed();
     }
 }

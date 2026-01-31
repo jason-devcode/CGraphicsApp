@@ -6,24 +6,29 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.util.Log;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 public class CompilerActivity extends Activity {
 
+    private static final String TAG = "CompilerActivity";
     private static final int REQUEST_CODE_PICK_FILE = 200;
 
     private TextView selectedFileText;
     private TextView outputText;
+    private TextView changeStatusText;
     private Button selectFileButton;
     private Button compileButton;
     private Button executeButton;
@@ -31,9 +36,16 @@ public class CompilerActivity extends Activity {
     private ProgressBar progressBar;
     
     private File selectedSourceFile;
+    private Uri selectedSourceUri; // URI del archivo original
+    private String selectedFileName;
     private NativeCompiler compiler;
     private String lastCompiledSoPath = null;
     private String lastCompiledSoName = null;
+    private boolean lastWasExternal = false;
+    
+    // Detector de cambios en archivos
+    private FileChangeDetector fileChangeDetector;
+    private boolean fileHasChanged = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,6 +54,7 @@ public class CompilerActivity extends Activity {
 
         selectedFileText = findViewById(R.id.selected_file_text);
         outputText = findViewById(R.id.output_text);
+        changeStatusText = findViewById(R.id.change_status_text);
         selectFileButton = findViewById(R.id.select_file_button);
         compileButton = findViewById(R.id.compile_button);
         executeButton = findViewById(R.id.execute_button);
@@ -49,6 +62,7 @@ public class CompilerActivity extends Activity {
         progressBar = findViewById(R.id.compile_progress_bar);
 
         compiler = new NativeCompiler(this);
+        fileChangeDetector = new FileChangeDetector();
 
         compileButton.setEnabled(false);
         executeButton.setEnabled(false);
@@ -77,6 +91,236 @@ public class CompilerActivity extends Activity {
                 }
             }
         });
+        
+        // Limpiar archivos temporales al iniciar
+        cleanupTempSoFiles();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Recargar archivo desde el URI si hay uno seleccionado
+        if (selectedSourceUri != null) {
+            Log.d(TAG, "onResume - Limpiando cache completo y recargando archivo desde almacenamiento");
+            
+            // Recargar el archivo desde el URI al cache
+            new AsyncTask<Void, Void, File>() {
+                @Override
+                protected File doInBackground(Void... voids) {
+                    try {
+                        // PASO 1: Limpiar TODO el cache (archivos .c y .so)
+                        Log.d(TAG, "onResume - Limpiando cache completo...");
+                        cleanupAllCacheFiles();
+                        
+                        // PASO 2: Copiar nuevamente desde el URI original
+                        Log.d(TAG, "onResume - Copiando archivo desde URI original...");
+                        return copyUriToTempFile(selectedSourceUri);
+                    } catch (Exception e) {
+                        Log.e(TAG, "onResume - Error recargando archivo", e);
+                        return null;
+                    }
+                }
+
+                @Override
+                protected void onPostExecute(File file) {
+                    if (file != null) {
+                        selectedSourceFile = file;
+                        Log.d(TAG, "onResume - Archivo recargado desde almacenamiento: " + file.getAbsolutePath());
+                        
+                        // Resetear estado de compilación ya que eliminamos los .so
+                        lastCompiledSoPath = null;
+                        lastCompiledSoName = null;
+                        lastWasExternal = false;
+                        executeButton.setEnabled(false);
+                        
+                        // Actualizar UI
+                        selectedFileText.setText("Archivo seleccionado:\n" + selectedFileName + 
+                            "\n\n🔄 Recargado desde almacenamiento");
+                        outputText.setText("Archivo recargado desde almacenamiento.\n" +
+                                         "Compilaciones anteriores eliminadas.\n" +
+                                         "Listo para compilar versión actualizada.");
+                        
+                        // Resetear estado de cambios
+                        fileHasChanged = false;
+                        changeStatusText.setVisibility(View.GONE);
+                        
+                        // Ahora iniciar el monitoreo con el hash del archivo recién cargado
+                        startFileMonitoring();
+                        
+                        // Mostrar notificación
+                        Toast.makeText(CompilerActivity.this, 
+                            "✓ Archivo y cache sincronizados", 
+                            Toast.LENGTH_SHORT).show();
+                    } else {
+                        Log.e(TAG, "onResume - Error al recargar archivo");
+                        Toast.makeText(CompilerActivity.this, 
+                            "✗ Error al sincronizar archivo", 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }.execute();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Pausar monitoreo para ahorrar recursos
+        if (fileChangeDetector != null) {
+            Log.d(TAG, "onPause - Pausando monitoreo");
+            fileChangeDetector.stopMonitoring();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        // Detener monitoreo
+        if (fileChangeDetector != null) {
+            fileChangeDetector.stopMonitoring();
+        }
+        
+        // Limpiar archivos temporales al cerrar la actividad
+        cleanupTempSoFiles();
+        super.onDestroy();
+    }
+
+    /**
+     * Inicia el monitoreo del archivo a través del URI
+     */
+    private void startFileMonitoring() {
+        if (selectedSourceUri == null) {
+            Log.w(TAG, "No hay URI para monitorear");
+            return;
+        }
+
+        Log.d(TAG, "Iniciando monitoreo del URI: " + selectedSourceUri.toString());
+
+        fileChangeDetector.startMonitoring(selectedSourceUri, getContentResolver(), 
+            new FileChangeDetector.FileChangeListener() {
+                @Override
+                public void onFileChanged(Uri uri, String newHash) {
+                    Log.d(TAG, "¡Cambio detectado en el archivo!");
+                    Log.d(TAG, "URI: " + uri.toString());
+                    Log.d(TAG, "Nuevo hash: " + newHash);
+                    
+                    fileHasChanged = true;
+                    
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            // Actualizar UI para indicar que el archivo ha cambiado
+                            changeStatusText.setVisibility(View.VISIBLE);
+                            changeStatusText.setText("⚠️ CAMBIOS DETECTADOS - Recompila para actualizar");
+                            changeStatusText.setTextColor(0xFFFF9800); // Color naranja
+                            
+                            selectedFileText.setText("Archivo seleccionado:\n" + selectedFileName + 
+                                "\n\n⚠️ ARCHIVO MODIFICADO");
+                            
+                            // Mostrar notificación
+                            Toast.makeText(CompilerActivity.this, 
+                                "⚠️ Cambios detectados en: " + selectedFileName, 
+                                Toast.LENGTH_SHORT).show();
+                            
+                            // Actualizar texto de salida si es necesario
+                            String currentOutput = outputText.getText().toString();
+                            if (currentOutput.contains("Listo para compilar") ||
+                                currentOutput.contains("Compilado exitosamente")) {
+                                outputText.setText("⚠️ El archivo ha sido modificado\n" +
+                                                 "Recompila para aplicar los cambios");
+                            }
+                            
+                            // Recargar archivo modificado desde el URI al cache
+                            reloadFileFromUri();
+                        }
+                    });
+                }
+            });
+    }
+
+    /**
+     * Recarga el archivo desde el URI al cache
+     */
+    private void reloadFileFromUri() {
+        if (selectedSourceUri == null) {
+            Log.e(TAG, "No hay URI para recargar");
+            return;
+        }
+
+        Log.d(TAG, "Recargando archivo desde URI al cache...");
+
+        new AsyncTask<Void, Void, File>() {
+            @Override
+            protected File doInBackground(Void... voids) {
+                try {
+                    // Eliminar archivo en cache si existe
+                    if (selectedSourceFile != null && selectedSourceFile.exists()) {
+                        selectedSourceFile.delete();
+                        Log.d(TAG, "Archivo en cache eliminado: " + selectedSourceFile.getAbsolutePath());
+                    }
+                    
+                    // Copiar nuevamente desde el URI
+                    return copyUriToTempFile(selectedSourceUri);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error recargando archivo", e);
+                    return null;
+                }
+            }
+
+            @Override
+            protected void onPostExecute(File file) {
+                if (file != null) {
+                    selectedSourceFile = file;
+                    Log.d(TAG, "Archivo recargado en cache: " + file.getAbsolutePath());
+                    Toast.makeText(CompilerActivity.this, 
+                        "✓ Archivo actualizado en memoria", Toast.LENGTH_SHORT).show();
+                } else {
+                    Log.e(TAG, "Error al recargar archivo");
+                    Toast.makeText(CompilerActivity.this, 
+                        "✗ Error al actualizar archivo", Toast.LENGTH_SHORT).show();
+                }
+            }
+        }.execute();
+    }
+
+    /**
+     * Limpia todos los archivos .so y .c temporales del directorio de cache
+     */
+    private void cleanupTempSoFiles() {
+        File cacheDir = getCacheDir();
+        File[] files = cacheDir.listFiles();
+        
+        if (files != null) {
+            for (File file : files) {
+                String name = file.getName();
+                if (name.endsWith(".so") || name.startsWith("temp_")) {
+                    if (file.delete()) {
+                        Log.d(TAG, "Archivo temporal eliminado: " + file.getName());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Limpia TODOS los archivos del directorio de cache (método más agresivo)
+     * Se usa en onResume para garantizar una recarga completa desde almacenamiento
+     */
+    private void cleanupAllCacheFiles() {
+        File cacheDir = getCacheDir();
+        File[] files = cacheDir.listFiles();
+        
+        if (files != null) {
+            int deletedCount = 0;
+            for (File file : files) {
+                if (file.isFile()) {
+                    if (file.delete()) {
+                        deletedCount++;
+                        Log.d(TAG, "Cache eliminado: " + file.getName());
+                    }
+                }
+            }
+            Log.d(TAG, "Total de archivos eliminados del cache: " + deletedCount);
+        }
     }
 
     private void checkPermissionsAndSelectFile() {
@@ -105,6 +349,17 @@ public class CompilerActivity extends Activity {
         if (requestCode == REQUEST_CODE_PICK_FILE && resultCode == RESULT_OK) {
             if (data != null && data.getData() != null) {
                 Uri uri = data.getData();
+                
+                // Tomar persistencia del permiso para el URI
+                final int takeFlags = data.getFlags() & 
+                    (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                try {
+                    getContentResolver().takePersistableUriPermission(uri, takeFlags);
+                    Log.d(TAG, "Permiso persistente tomado para URI: " + uri);
+                } catch (SecurityException e) {
+                    Log.w(TAG, "No se pudo tomar permiso persistente", e);
+                }
+                
                 handleSelectedFile(uri);
             }
         } else if (requestCode == StoragePermissionHelper.REQUEST_CODE_READ_STORAGE ||
@@ -135,6 +390,14 @@ public class CompilerActivity extends Activity {
     }
 
     private void handleSelectedFile(Uri uri) {
+        // Detener monitoreo anterior si existe
+        if (fileChangeDetector != null) {
+            fileChangeDetector.stopMonitoring();
+        }
+        
+        // Guardar URI original
+        selectedSourceUri = uri;
+        
         new AsyncTask<Uri, Void, File>() {
             @Override
             protected File doInBackground(Uri... uris) {
@@ -145,14 +408,25 @@ public class CompilerActivity extends Activity {
             protected void onPostExecute(File file) {
                 if (file != null) {
                     selectedSourceFile = file;
-                    selectedFileText.setText("Archivo seleccionado:\n" + file.getName());
+                    selectedFileName = file.getName();
+                    
+                    selectedFileText.setText("Archivo seleccionado:\n" + selectedFileName);
                     compileButton.setEnabled(true);
                     outputText.setText("Listo para compilar");
+                    
+                    // Resetear estado de cambios
+                    fileHasChanged = false;
+                    changeStatusText.setVisibility(View.GONE);
                     
                     // Deshabilitar botón ejecutar hasta nueva compilación
                     executeButton.setEnabled(false);
                     lastCompiledSoPath = null;
                     lastCompiledSoName = null;
+                    lastWasExternal = false;
+                    
+                    // Iniciar monitoreo del archivo a través del URI
+                    Log.d(TAG, "Archivo copiado a cache, iniciando monitoreo del URI");
+                    startFileMonitoring();
                 } else {
                     Toast.makeText(CompilerActivity.this, 
                         "Error al leer el archivo", Toast.LENGTH_SHORT).show();
@@ -162,9 +436,13 @@ public class CompilerActivity extends Activity {
     }
 
     private File copyUriToTempFile(Uri uri) {
+        InputStream inputStream = null;
+        OutputStream outputStream = null;
+        
         try {
-            InputStream inputStream = getContentResolver().openInputStream(uri);
+            inputStream = getContentResolver().openInputStream(uri);
             if (inputStream == null) {
+                Log.e(TAG, "No se pudo abrir InputStream para URI: " + uri);
                 return null;
             }
 
@@ -180,7 +458,7 @@ public class CompilerActivity extends Activity {
             }
 
             File tempFile = new File(getCacheDir(), fileName);
-            OutputStream outputStream = new FileOutputStream(tempFile);
+            outputStream = new FileOutputStream(tempFile);
 
             byte[] buffer = new byte[8192];
             int bytesRead;
@@ -188,14 +466,19 @@ public class CompilerActivity extends Activity {
                 outputStream.write(buffer, 0, bytesRead);
             }
 
-            outputStream.close();
-            inputStream.close();
-
+            Log.d(TAG, "Archivo copiado a: " + tempFile.getAbsolutePath());
             return tempFile;
 
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "Error copiando archivo desde URI", e);
             return null;
+        } finally {
+            try {
+                if (outputStream != null) outputStream.close();
+                if (inputStream != null) inputStream.close();
+            } catch (Exception e) {
+                Log.e(TAG, "Error cerrando streams", e);
+            }
         }
     }
 
@@ -232,6 +515,7 @@ public class CompilerActivity extends Activity {
 
                 StringBuilder output = new StringBuilder();
                 output.append("═══ RESULTADO DE COMPILACIÓN ═══\n\n");
+                // output.append(result.getCommand()).append("\n\n");
                 output.append("Estado: ").append(result.isSuccess() ? "✓ ÉXITO" : "✗ ERROR").append("\n");
                 output.append("Mensaje: ").append(result.getMessage()).append("\n\n");
 
@@ -245,16 +529,27 @@ public class CompilerActivity extends Activity {
                         "Almacenamiento externo (/mis_so/)" : 
                         "Almacenamiento interno (app privado)").append("\n\n");
                     
-                    // CORRECCIÓN: Guardar la ruta REAL del .so (no asumir ubicación)
+                    // Guardar la ruta REAL del .so y si está en almacenamiento externo
                     lastCompiledSoPath = result.getOutputPath();
                     lastCompiledSoName = outputFile.getName();
+                    lastWasExternal = saveToExternal;
                     executeButton.setEnabled(true);
                     
+                    // Resetear bandera de cambios después de compilar
+                    fileHasChanged = false;
+                    changeStatusText.setVisibility(View.GONE);
+                    
+                    // Actualizar texto de archivo seleccionado
+                    selectedFileText.setText("Archivo seleccionado:\n" + selectedFileName +
+                        "\n✓ Compilado exitosamente");
+                    
                     output.append("✓ Presiona 'EJECUTAR MOTOR GRÁFICO' para probarlo\n\n");
+                    output.append("ℹ️ La librería se cargará en un proceso separado\n");
+                    output.append("que se limpia automáticamente al salir del renderizado.\n");
                 }
 
                 if (result.getOutput() != null && !result.getOutput().isEmpty()) {
-                    output.append("═══ SALIDA DEL COMPILADOR ═══\n");
+                    output.append("\n═══ SALIDA DEL COMPILADOR ═══\n");
                     output.append(result.getOutput());
                 }
 
@@ -276,6 +571,14 @@ public class CompilerActivity extends Activity {
             Toast.makeText(this, "No hay ninguna librería compilada", Toast.LENGTH_SHORT).show();
             return;
         }
+        
+        // Advertir si el archivo ha cambiado desde la última compilación
+        if (fileHasChanged) {
+            Toast.makeText(this, 
+                "⚠️ Advertencia: El archivo ha sido modificado\nRecompila antes de ejecutar", 
+                Toast.LENGTH_LONG).show();
+            return;
+        }
 
         File soFile = new File(lastCompiledSoPath);
         if (!soFile.exists()) {
@@ -284,11 +587,90 @@ public class CompilerActivity extends Activity {
             return;
         }
 
-        // CORRECCIÓN: Pasar la ruta REAL del .so (puede estar en externo o interno)
+        // Si el .so está en almacenamiento externo, copiarlo temporalmente al cache
+        if (lastWasExternal) {
+            Toast.makeText(this, "Preparando librería desde almacenamiento externo...", 
+                Toast.LENGTH_SHORT).show();
+            
+            new AsyncTask<Void, Void, String>() {
+                @Override
+                protected String doInBackground(Void... voids) {
+                    return copyExternalSoToCache(lastCompiledSoPath, lastCompiledSoName);
+                }
+
+                @Override
+                protected void onPostExecute(String tempSoPath) {
+                    if (tempSoPath != null) {
+                        launchRenderActivity(tempSoPath, lastCompiledSoName, true);
+                    } else {
+                        Toast.makeText(CompilerActivity.this, 
+                            "Error al copiar librería al cache", Toast.LENGTH_LONG).show();
+                    }
+                }
+            }.execute();
+        } else {
+            // Si está en almacenamiento interno, usar directamente
+            launchRenderActivity(lastCompiledSoPath, lastCompiledSoName, false);
+        }
+    }
+
+    /**
+     * Copia un archivo .so del almacenamiento externo al cache de la app
+     */
+    private String copyExternalSoToCache(String externalSoPath, String soName) {
+        try {
+            File sourceFile = new File(externalSoPath);
+            if (!sourceFile.exists()) {
+                Log.e(TAG, "Archivo fuente no existe: " + externalSoPath);
+                return null;
+            }
+
+            // Crear archivo temporal en cache
+            File tempSoFile = new File(getCacheDir(), "temp_" + soName);
+            
+            // Si ya existe, eliminarlo primero
+            if (tempSoFile.exists()) {
+                tempSoFile.delete();
+            }
+
+            Log.d(TAG, "Copiando .so de " + externalSoPath + " a " + tempSoFile.getAbsolutePath());
+
+            // Copiar el archivo
+            FileInputStream inputStream = new FileInputStream(sourceFile);
+            FileOutputStream outputStream = new FileOutputStream(tempSoFile);
+
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            long totalBytes = 0;
+            
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+                totalBytes += bytesRead;
+            }
+
+            outputStream.flush();
+            outputStream.close();
+            inputStream.close();
+
+            Log.d(TAG, "Copia completada: " + totalBytes + " bytes");
+            
+            return tempSoFile.getAbsolutePath();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error al copiar .so al cache", e);
+            return null;
+        }
+    }
+
+    /**
+     * Lanza RenderActivity con la ruta del .so
+     * La librería se cargará en un proceso separado que se limpia automáticamente
+     */
+    private void launchRenderActivity(String soPath, String soName, boolean isTemporary) {
         Intent intent = new Intent(this, RenderActivity.class);
-        intent.putExtra(RenderActivity.EXTRA_SO_PATH, lastCompiledSoPath);
-        intent.putExtra(RenderActivity.EXTRA_SO_NAME, lastCompiledSoName != null ? 
-            lastCompiledSoName : soFile.getName());
+        intent.putExtra(RenderActivity.EXTRA_SO_PATH, soPath);
+        intent.putExtra(RenderActivity.EXTRA_SO_NAME, soName);
+        intent.putExtra(RenderActivity.EXTRA_IS_TEMPORARY, isTemporary);
         startActivity(intent);
     }
 
