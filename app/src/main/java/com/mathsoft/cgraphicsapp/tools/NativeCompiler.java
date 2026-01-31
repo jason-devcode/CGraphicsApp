@@ -175,36 +175,33 @@ public class NativeCompiler {
      */
     private File prepareOutputFile(String outputName, boolean saveToExternalStorage) {
         String outputFileName = outputName;
-        if (!outputFileName.startsWith("lib")) {
-            outputFileName = "lib" + outputFileName;
-        }
-        if (!outputFileName.endsWith(".so")) {
-            outputFileName = outputFileName + ".so";
-        }
-
-        File outputDir;
         
-        if (saveToExternalStorage) {
-            // Guardar en almacenamiento externo: /storage/emulated/0/mis_so/
-            outputDir = new File(Environment.getExternalStorageDirectory(), "mis_so");
-            
-            if (!outputDir.exists()) {
-                if (!outputDir.mkdirs()) {
-                    Log.e(TAG, "Failed to create external directory: " + outputDir.getAbsolutePath());
-                    return null;
-                }
-            }
-            
-            Log.d(TAG, "Output directory (external): " + outputDir.getAbsolutePath());
-        } else {
-            // Guardar en almacenamiento interno de la app
-            outputDir = new File(context.getFilesDir(), "compiled");
-            if (!outputDir.exists()) {
-                outputDir.mkdirs();
-            }
-            
-            Log.d(TAG, "Output directory (internal): " + outputDir.getAbsolutePath());
+        // Agregar prefijo lib al nombre del fichero de salida
+        if (!outputFileName.startsWith("lib")) outputFileName = "lib" + outputFileName;
+        // Agregar la extensión .so al nombre del fichero de salida
+        if (!outputFileName.endsWith(".so")) outputFileName = outputFileName + ".so";
+
+        File outputDir = saveToExternalStorage ? 
+            new File(Environment.getExternalStorageDirectory(), "mis_so") 
+            : 
+            new File(context.getFilesDir(), "compiled")
+        ;
+
+        if (!outputDir.exists() && !outputDir.mkdirs()) {
+            if(saveToExternalStorage) Log.e(TAG, "Failed to create external directory: " + outputDir.getAbsolutePath());
+            else Log.e(TAG, "Failed to create compiled directory: " + outputDir.getAbsolutePath());
+            return null;
         }
+            
+        Log.d(
+            TAG, 
+            "Output directory " + 
+            (saveToExternalStorage 
+                ? "(external)" : "(internal)" 
+            ) + 
+            ": " 
+            + outputDir.getAbsolutePath()
+        );
 
         return new File(outputDir, outputFileName);
     }
@@ -229,7 +226,8 @@ public class NativeCompiler {
         // Flags de compilación
         command.add("-shared");
         command.add("-fPIC");
-        command.add("-O2"); // Optimización
+        command.add("-lm");
+        command.add("-O3"); // Optimización
         
         // Suprimir warnings comunes
         command.add("-w"); // Deshabilitar warnings
