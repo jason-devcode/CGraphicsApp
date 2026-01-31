@@ -33,6 +33,7 @@ public class CompilerActivity extends Activity {
     private File selectedSourceFile;
     private NativeCompiler compiler;
     private String lastCompiledSoPath = null;
+    private String lastCompiledSoName = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -151,6 +152,7 @@ public class CompilerActivity extends Activity {
                     // Deshabilitar botón ejecutar hasta nueva compilación
                     executeButton.setEnabled(false);
                     lastCompiledSoPath = null;
+                    lastCompiledSoName = null;
                 } else {
                     Toast.makeText(CompilerActivity.this, 
                         "Error al leer el archivo", Toast.LENGTH_SHORT).show();
@@ -214,7 +216,7 @@ public class CompilerActivity extends Activity {
                 progressBar.setVisibility(ProgressBar.VISIBLE);
                 compileButton.setEnabled(false);
                 executeButton.setEnabled(false);
-                outputText.setText("Compilando...");
+                outputText.setText("Compilando...\n(Eliminando versión anterior si existe)");
             }
 
             @Override
@@ -243,8 +245,9 @@ public class CompilerActivity extends Activity {
                         "Almacenamiento externo (/mis_so/)" : 
                         "Almacenamiento interno (app privado)").append("\n\n");
                     
-                    // Guardar ruta del .so para ejecución
+                    // CORRECCIÓN: Guardar la ruta REAL del .so (no asumir ubicación)
                     lastCompiledSoPath = result.getOutputPath();
+                    lastCompiledSoName = outputFile.getName();
                     executeButton.setEnabled(true);
                     
                     output.append("✓ Presiona 'EJECUTAR MOTOR GRÁFICO' para probarlo\n\n");
@@ -276,14 +279,16 @@ public class CompilerActivity extends Activity {
 
         File soFile = new File(lastCompiledSoPath);
         if (!soFile.exists()) {
-            Toast.makeText(this, "El archivo .so no existe", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "El archivo .so no existe: " + lastCompiledSoPath, 
+                Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Crear Intent para RenderActivity
+        // CORRECCIÓN: Pasar la ruta REAL del .so (puede estar en externo o interno)
         Intent intent = new Intent(this, RenderActivity.class);
         intent.putExtra(RenderActivity.EXTRA_SO_PATH, lastCompiledSoPath);
-        intent.putExtra(RenderActivity.EXTRA_SO_NAME, soFile.getName());
+        intent.putExtra(RenderActivity.EXTRA_SO_NAME, lastCompiledSoName != null ? 
+            lastCompiledSoName : soFile.getName());
         startActivity(intent);
     }
 

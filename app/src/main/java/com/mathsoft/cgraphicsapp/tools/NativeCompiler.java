@@ -65,11 +65,22 @@ public class NativeCompiler {
                 "Verifica los permisos de almacenamiento.", "");
         }
 
+        // IMPORTANTE: Eliminar archivo .so anterior si existe
+        if (outputFile.exists()) {
+            Log.d(TAG, "Eliminando .so anterior: " + outputFile.getAbsolutePath());
+            if (outputFile.delete()) {
+                Log.d(TAG, "Archivo anterior eliminado exitosamente");
+            } else {
+                Log.w(TAG, "No se pudo eliminar el archivo anterior");
+            }
+        }
+
         // Construir comando de compilación
         List<String> command = buildCompileCommand(clangBinary, compilerDir, sourceFile, outputFile);
 
         Log.d(TAG, "Compile command: " + command.toString());
         Log.d(TAG, "TMPDIR: " + tmpDir.getAbsolutePath());
+        Log.d(TAG, "Output file: " + outputFile.getAbsolutePath());
 
         // Ejecutar compilación con variables de entorno
         return executeCompilation(command, outputFile, compilerDir, tmpDir);
@@ -175,13 +186,7 @@ public class NativeCompiler {
         
         if (saveToExternalStorage) {
             // Guardar en almacenamiento externo: /storage/emulated/0/mis_so/
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // Android 11+
-                outputDir = new File(Environment.getExternalStorageDirectory(), "mis_so");
-            } else {
-                // Android 10 y anteriores
-                outputDir = new File(Environment.getExternalStorageDirectory(), "mis_so");
-            }
+            outputDir = new File(Environment.getExternalStorageDirectory(), "mis_so");
             
             if (!outputDir.exists()) {
                 if (!outputDir.mkdirs()) {
@@ -189,12 +194,16 @@ public class NativeCompiler {
                     return null;
                 }
             }
+            
+            Log.d(TAG, "Output directory (external): " + outputDir.getAbsolutePath());
         } else {
             // Guardar en almacenamiento interno de la app
             outputDir = new File(context.getFilesDir(), "compiled");
             if (!outputDir.exists()) {
                 outputDir.mkdirs();
             }
+            
+            Log.d(TAG, "Output directory (internal): " + outputDir.getAbsolutePath());
         }
 
         return new File(outputDir, outputFileName);
@@ -221,7 +230,6 @@ public class NativeCompiler {
         command.add("-shared");
         command.add("-fPIC");
         command.add("-O2"); // Optimización
-        command.add("-lm");
         
         // Suprimir warnings comunes
         command.add("-w"); // Deshabilitar warnings
@@ -338,6 +346,8 @@ public class NativeCompiler {
                 if (!outputFile.exists()) {
                     output.append("\nEl archivo de salida no fue creado");
                 }
+            } else {
+                Log.d(TAG, "Compilation successful. Output: " + outputFile.getAbsolutePath());
             }
 
             // Limpiar archivos temporales después de compilar
