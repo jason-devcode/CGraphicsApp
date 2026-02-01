@@ -107,7 +107,7 @@ public class UIManager {
             consoleOutput.setText("Compilando...\n(Eliminando versión anterior si existe)");
             
             // Cambiar a la pestaña de consola
-            tabHost.setCurrentTabByTag("console");
+            // tabHost.setCurrentTabByTag("console");
         });
     }
 
@@ -117,7 +117,7 @@ public class UIManager {
             compileButton.setEnabled(true);
 
             // Cambiar a la pestaña de consola
-            tabHost.setCurrentTabByTag("console");
+            // tabHost.setCurrentTabByTag("console");
 
             StringBuilder output = new StringBuilder();
             output.append("═══ RESULTADO DE COMPILACIÓN ═══\n\n");

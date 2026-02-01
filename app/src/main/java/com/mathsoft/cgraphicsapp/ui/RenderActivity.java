@@ -1,8 +1,13 @@
 package com.mathsoft.cgraphicsapp;
 
 import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
+import android.os.RemoteException;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -29,12 +34,26 @@ public class RenderActivity extends Activity {
     private String soPath;
     private String soName;
     private boolean isTemporary;
-    private boolean libraryLoaded = false;
-    private boolean renderingActive = false;
 
-    // Métodos nativos
-    private native void initRendering(Surface surface);
-    private native void stopRendering();
+    private IRenderService renderService;
+    private boolean bound = false;
+
+    private final ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            renderService = IRenderService.Stub.asInterface(service);
+            bound = true;
+            Log.d(TAG, "Servicio binded. Cargando librería...");
+            loadLibraryInService();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            bound = false;
+            renderService = null;
+            Log.d(TAG, "Servicio disconnected");
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,111 +76,96 @@ public class RenderActivity extends Activity {
         Log.d(TAG, "Is Temporary: " + isTemporary);
 
         setupUI();
-        loadNativeLibrary();
+
+        // Iniciar y bindear al servicio
+        Intent serviceIntent = new Intent(this, RenderService.class);
+        serviceIntent.putExtra(EXTRA_SO_PATH, soPath);  // Puedes pasar extras si necesitas, pero usamos AIDL para load
+        startService(serviceIntent);  // Inicia el servicio (crea el proceso)
+        bindService(serviceIntent, connection, Context.BIND_AUTO_CREATE);
     }
 
     private void setupUI() {
-        // Layout principal
         LinearLayout mainLayout = new LinearLayout(this);
         mainLayout.setOrientation(LinearLayout.VERTICAL);
         mainLayout.setBackgroundColor(0xFF1A1A1A);
 
-        // Texto de información
         infoText = new TextView(this);
         infoText.setText("Cargando motor gráfico...\n" + soName);
         infoText.setTextColor(0xFFFFFFFF);
-        infoText.setPadding(16, 16, 16, 16);
-        infoText.setTextSize(14);
+        infoText.setPadding(8, 8, 8, 8);  // Padding reducido
+        infoText.setTextSize(10);  // Tamaño de texto más pequeño
+        infoText.setBackgroundColor(0x40000000);  // Fondo semi-transparente (25% opacidad)
         LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,  // Ancho ajustado al contenido
             ViewGroup.LayoutParams.WRAP_CONTENT
         );
+        infoParams.setMargins(8, 8, 8, 8);  // Márgenes pequeños
         infoText.setLayoutParams(infoParams);
 
-        // SurfaceView para el renderizado
         surfaceView = new SurfaceView(this);
         surfaceView.setZOrderOnTop(false);
         LinearLayout.LayoutParams surfaceParams = new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             0,
-            1.0f  // weight para que ocupe todo el espacio disponible
+            1.0f
         );
         surfaceView.setLayoutParams(surfaceParams);
 
-        // Botón para volver
         backButton = new Button(this);
-        backButton.setText("⬅ VOLVER AL COMPILADOR");
+        backButton.setText("⬅ VOLVER");
+        backButton.setTextSize(11);  // Texto del botón más pequeño
+        backButton.setPadding(16, 8, 16, 8);  // Padding vertical reducido
         backButton.setOnClickListener(v -> finish());
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
+            ViewGroup.LayoutParams.WRAP_CONTENT,  // Ancho ajustado al contenido
+            ViewGroup.LayoutParams.WRAP_CONTENT   // Alto ajustado al contenido
         );
-        buttonParams.setMargins(16, 16, 16, 16);
+        buttonParams.setMargins(8, 8, 8, 8);  // Márgenes más pequeños
         backButton.setLayoutParams(buttonParams);
 
-        // Agregar vistas al layout
-        mainLayout.addView(infoText);
+        // mainLayout.addView(infoText);
         mainLayout.addView(surfaceView);
         mainLayout.addView(backButton);
 
         setContentView(mainLayout);
     }
 
-    private void loadNativeLibrary() {
+    private void loadLibraryInService() {
+        if (!bound) return;
         try {
-            Log.d(TAG, "Intentando cargar librería: " + soPath);
-            infoText.setText("Cargando: " + soName + "\n" + soPath +
-                (isTemporary ? "\n(Copia temporal)" : ""));
-
-            // Verificar que el archivo existe
+            // Verificar archivo
             File soFile = new File(soPath);
             if (!soFile.exists()) {
                 throw new Exception("El archivo .so no existe");
             }
 
-            Log.d(TAG, "Archivo existe, tamaño: " + soFile.length() + " bytes");
+            infoText.setText("Cargando: " + soName + "\n" + soPath +
+                (isTemporary ? "\n(Copia temporal)" : ""));
 
-            // Cargar la librería
-            System.load(soPath);
-            libraryLoaded = true;
+            renderService.loadLibrary(soPath);
+            infoText.setText("✓ Librería cargada en servicio aislado\nInicializando rendering...");
 
-            Log.d(TAG, "Librería cargada exitosamente");
-            infoText.setText("✓ Librería cargada: " + soName + "\nInicializando rendering...");
-
-            // Configurar el SurfaceView
             setupSurface();
 
-        } catch (UnsatisfiedLinkError e) {
-            String error = "Error al cargar librería: " + e.getMessage();
-            Log.e(TAG, error, e);
-            infoText.setText("✗ " + error);
-            Toast.makeText(this, error, Toast.LENGTH_LONG).show();
-            libraryLoaded = false;
+        } catch (RemoteException e) {
+            Log.e(TAG, "Error en IPC: " + e.getMessage(), e);
+            infoText.setText("✗ Error en comunicación con servicio");
         } catch (Exception e) {
-            String error = "Error: " + e.getMessage();
-            Log.e(TAG, error, e);
-            infoText.setText("✗ " + error);
-            Toast.makeText(this, error, Toast.LENGTH_LONG).show();
-            libraryLoaded = false;
+            Log.e(TAG, "Error: " + e.getMessage(), e);
+            infoText.setText("✗ " + e.getMessage());
         }
     }
 
     private void setupSurface() {
-        if (!libraryLoaded) {
-            return;
-        }
-
-        // Configurar formato de píxeles
+        // Configurar formato
         surfaceView.getHolder().setFormat(android.graphics.PixelFormat.RGBA_8888);
 
-        // Configurar callback del surface
         surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(SurfaceHolder holder) {
                 Log.d(TAG, "surfaceCreated");
-                
-                if (holder.getSurface().isValid() && libraryLoaded && !renderingActive) {
-                    startRendering(holder.getSurface());
+                if (holder.getSurface().isValid() && bound) {
+                    startRenderingInService(holder.getSurface());
                 }
             }
 
@@ -176,74 +180,46 @@ public class RenderActivity extends Activity {
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
                 Log.d(TAG, "surfaceDestroyed");
-                stopRenderingIfActive();
+                stopRenderingInService();
             }
         });
 
-        // Si el surface ya está disponible, iniciar inmediatamente
         SurfaceHolder holder = surfaceView.getHolder();
         if (holder.getSurface() != null && holder.getSurface().isValid()) {
-            Log.d(TAG, "Surface ya disponible, iniciando rendering directamente");
-            startRendering(holder.getSurface());
+            Log.d(TAG, "Surface ya disponible");
+            startRenderingInService(holder.getSurface());
         }
     }
 
-    private void startRendering(Surface surface) {
-        if (!libraryLoaded || renderingActive) {
-            return;
-        }
-
+    private void startRenderingInService(Surface surface) {
+        if (!bound) return;
         try {
-            Log.d(TAG, "Iniciando rendering...");
-            initRendering(surface);
-            renderingActive = true;
-            Log.d(TAG, "Rendering iniciado exitosamente");
+            Log.d(TAG, "Pasando Surface al servicio - isValid: " + surface.isValid());
             
-            runOnUiThread(() -> {
-                infoText.setText("✓ Motor gráfico en ejecución\n" + soName);
-                Toast.makeText(this, "Rendering iniciado", Toast.LENGTH_SHORT).show();
-            });
-
-        } catch (UnsatisfiedLinkError e) {
-            String error = "Error: Método initRendering no encontrado en el .so";
-            Log.e(TAG, error, e);
-            runOnUiThread(() -> {
-                infoText.setText("✗ " + error);
-                Toast.makeText(this, error, Toast.LENGTH_LONG).show();
-            });
-            renderingActive = false;
-        } catch (Exception e) {
-            String error = "Error al iniciar rendering: " + e.getMessage();
-            Log.e(TAG, error, e);
-            runOnUiThread(() -> {
-                infoText.setText("✗ " + error);
-                Toast.makeText(this, error, Toast.LENGTH_LONG).show();
-            });
-            renderingActive = false;
+            // Verificar que el Surface sea válido antes de enviar
+            if (!surface.isValid()) {
+                Log.e(TAG, "Surface no válido antes de IPC");
+                return;
+            }
+            
+            renderService.initRendering(surface);
+            Log.d(TAG, "initRendering llamado vía IPC");
+            Toast.makeText(this, "Rendering iniciado en servicio", Toast.LENGTH_SHORT).show();
+        } catch (RemoteException e) {
+            Log.e(TAG, "Error al iniciar rendering vía IPC: " + e.getMessage(), e);
+            infoText.setText("✗ Error en rendering");
         }
     }
 
-    private void stopRenderingIfActive() {
-        if (!renderingActive) {
-            return;
-        }
-
+    private void stopRenderingInService() {
+        if (!bound) return;
         try {
-            Log.d(TAG, "Deteniendo rendering...");
-            stopRendering();
-            renderingActive = false;
-            Log.d(TAG, "Rendering detenido");
-
-        } catch (UnsatisfiedLinkError e) {
-            Log.e(TAG, "Método stopRendering no encontrado", e);
-        } catch (Exception e) {
-            Log.e(TAG, "Error al detener rendering", e);
+            renderService.stopRendering();
+        } catch (RemoteException e) {
+            Log.e(TAG, "Error al detener rendering vía IPC: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * Elimina el archivo .so temporal si fue creado
-     */
     private void deleteTemporarySo() {
         if (isTemporary && soPath != null) {
             File tempFile = new File(soPath);
@@ -258,23 +234,26 @@ public class RenderActivity extends Activity {
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        Log.d(TAG, "onPause");
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        Log.d(TAG, "onResume");
-    }
-
-    @Override
     protected void onDestroy() {
         Log.d(TAG, "onDestroy");
-        stopRenderingIfActive();
+        stopRenderingInService();
         
-        // Eliminar archivo temporal si existe
+        if (bound) {
+            unbindService(connection);
+            bound = false;
+        }
+        
+        // IMPORTANTE: Detener el servicio para MATAR el proceso
+        Intent serviceIntent = new Intent(this, RenderService.class);
+        stopService(serviceIntent);
+        
+        // Dar tiempo para que el proceso termine
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        
         deleteTemporarySo();
         
         super.onDestroy();
@@ -282,12 +261,8 @@ public class RenderActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        // Detener rendering antes de salir
-        stopRenderingIfActive();
-        
-        // Eliminar archivo temporal si existe
+        stopRenderingInService();
         deleteTemporarySo();
-        
         super.onBackPressed();
     }
 }

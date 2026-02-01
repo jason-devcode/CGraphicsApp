@@ -33,6 +33,13 @@
             android:screenOrientation="landscape"
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
             android:parentActivityName=".CompilerActivity" />
+
+        <service 
+            android:name=".RenderService"
+            android:enabled="true"
+            android:exported="false"
+            android:process=":render_process"
+        />
     </application>
 
 </manifest>

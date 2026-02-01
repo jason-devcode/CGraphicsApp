@@ -105,7 +105,11 @@
             android:orientation="vertical">
 
             <!-- Tabs -->
-            
+            <TabWidget
+                android:id="@android:id/tabs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#FFFFFF" />
 
             <!-- Tab Content -->
             <FrameLayout
@@ -160,11 +164,6 @@
 
             </FrameLayout>
 
-            <TabWidget
-                android:id="@android:id/tabs"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="#FFFFFF" />
 
         </LinearLayout>
 

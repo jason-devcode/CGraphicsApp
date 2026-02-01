@@ -30,13 +30,19 @@ public class CompilationManager {
         this.context = context;
         this.compiler = new NativeCompiler(context);
     }
+    
+    private String getUniqueLibraryName(String baseName) {
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        return baseName + "_" + timestamp;
+    }
+    
 
     public void compile(File sourceFile, boolean saveToExternal, CompilationCallback callback) {
         new AsyncTask<Void, Void, NativeCompiler.CompilationResult>() {
             @Override
             protected NativeCompiler.CompilationResult doInBackground(Void... voids) {
                 String outputName = sourceFile.getName().replace(".c", "");
-                return compiler.compile(sourceFile, outputName, saveToExternal);
+                return compiler.compile(sourceFile, getUniqueLibraryName(outputName), saveToExternal);
             }
 
             @Override

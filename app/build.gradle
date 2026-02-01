@@ -16,6 +16,10 @@ android {
         // }
     }
 
+    buildFeatures {
+        aidl = true
+    }
+
     // Configure CMake for native code compilation
     // externalNativeBuild {
     //     cmake {
