@@ -283,11 +283,15 @@ public class FileManager {
         }
     }
 
-    // Getters y setters
+    // Getters
     public File getSelectedSourceFile() { return selectedSourceFile; }
     public Uri getSelectedSourceUri() { return selectedSourceUri; }
     public String getSelectedFileName() { return selectedFileName; }
     public boolean hasFileChanged() { return fileHasChanged; }
+    
+    // Setters (para restaurar estado después de rotación)
+    public void setSelectedSourceUri(Uri uri) { this.selectedSourceUri = uri; }
+    public void setSelectedFileName(String name) { this.selectedFileName = name; }
     public void setFileChanged(boolean changed) { this.fileHasChanged = changed; }
     public void resetChangeFlag() { this.fileHasChanged = false; }
 

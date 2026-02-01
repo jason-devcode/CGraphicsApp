@@ -22,6 +22,21 @@ public class CompilerActivity extends Activity {
     private static final String TAG = "CompilerActivity";
     private static final int REQUEST_CODE_PICK_FILE = 200;
 
+    // Estado Keys para Bundle
+    private static final String STATE_EDITOR_TEXT = "editor_text";
+    private static final String STATE_CONSOLE_TEXT = "console_text";
+    private static final String STATE_FILE_URI = "file_uri";
+    private static final String STATE_FILE_NAME = "file_name";
+    private static final String STATE_COMPILE_ENABLED = "compile_enabled";
+    private static final String STATE_EXECUTE_ENABLED = "execute_enabled";
+    private static final String STATE_SAVE_ENABLED = "save_enabled";
+    private static final String STATE_CURRENT_TAB = "current_tab";
+    private static final String STATE_SAVE_TO_EXTERNAL = "save_to_external";
+    private static final String STATE_FILE_CHANGED = "file_changed";
+    private static final String STATE_LAST_SO_PATH = "last_so_path";
+    private static final String STATE_LAST_SO_NAME = "last_so_name";
+    private static final String STATE_LAST_IS_TEMPORARY = "last_is_temporary";
+
     // UI Components
     private TabHost tabHost;
     private EditText codeEditor;
@@ -49,6 +64,120 @@ public class CompilerActivity extends Activity {
         initializeComponents();
         setupUI();
         setupListeners();
+        
+        // Restaurar estado si existe
+        if (savedInstanceState != null) {
+            restoreInstanceState(savedInstanceState);
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        
+        // Guardar texto del editor
+        outState.putString(STATE_EDITOR_TEXT, codeEditor.getText().toString());
+        
+        // Guardar texto de consola
+        outState.putString(STATE_CONSOLE_TEXT, consoleOutput.getText().toString());
+        
+        // Guardar URI del archivo
+        Uri fileUri = fileManager.getSelectedSourceUri();
+        if (fileUri != null) {
+            outState.putString(STATE_FILE_URI, fileUri.toString());
+        }
+        
+        // Guardar nombre del archivo
+        String fileName = fileManager.getSelectedFileName();
+        if (fileName != null) {
+            outState.putString(STATE_FILE_NAME, fileName);
+        }
+        
+        // Guardar estados de botones
+        outState.putBoolean(STATE_COMPILE_ENABLED, compileButton.isEnabled());
+        outState.putBoolean(STATE_EXECUTE_ENABLED, executeButton.isEnabled());
+        outState.putBoolean(STATE_SAVE_ENABLED, saveButton.isEnabled());
+        
+        // Guardar tab actual
+        outState.putString(STATE_CURRENT_TAB, tabHost.getCurrentTabTag());
+        
+        // Guardar estado del checkbox
+        outState.putBoolean(STATE_SAVE_TO_EXTERNAL, saveToExternalCheckBox.isChecked());
+        
+        // Guardar flag de cambios
+        outState.putBoolean(STATE_FILE_CHANGED, fileManager.hasFileChanged());
+        
+        // Guardar información de la última compilación
+        if (compilationManager.hasLastCompilation()) {
+            outState.putString(STATE_LAST_SO_PATH, compilationManager.getLastSoPath());
+            outState.putString(STATE_LAST_SO_NAME, compilationManager.getLastSoName());
+            outState.putBoolean(STATE_LAST_IS_TEMPORARY, compilationManager.isLastTemporary());
+        }
+    }
+
+    private void restoreInstanceState(Bundle savedState) {
+        // Restaurar texto del editor
+        String editorText = savedState.getString(STATE_EDITOR_TEXT);
+        if (editorText != null) {
+            codeEditor.setText(editorText);
+        }
+        
+        // Restaurar texto de consola
+        String consoleText = savedState.getString(STATE_CONSOLE_TEXT);
+        if (consoleText != null) {
+            consoleOutput.setText(consoleText);
+        }
+        
+        // Restaurar URI del archivo
+        String fileUriString = savedState.getString(STATE_FILE_URI);
+        if (fileUriString != null) {
+            Uri fileUri = Uri.parse(fileUriString);
+            fileManager.setSelectedSourceUri(fileUri);
+        }
+        
+        // Restaurar nombre del archivo
+        String fileName = savedState.getString(STATE_FILE_NAME);
+        if (fileName != null) {
+            fileManager.setSelectedFileName(fileName);
+            uiManager.updateFileName(fileName);
+        }
+        
+        // Restaurar estados de botones
+        compileButton.setEnabled(savedState.getBoolean(STATE_COMPILE_ENABLED, false));
+        executeButton.setEnabled(savedState.getBoolean(STATE_EXECUTE_ENABLED, false));
+        saveButton.setEnabled(savedState.getBoolean(STATE_SAVE_ENABLED, false));
+        
+        // Restaurar tab actual
+        String currentTab = savedState.getString(STATE_CURRENT_TAB);
+        if (currentTab != null) {
+            tabHost.setCurrentTabByTag(currentTab);
+        }
+        
+        // Restaurar checkbox
+        saveToExternalCheckBox.setChecked(savedState.getBoolean(STATE_SAVE_TO_EXTERNAL, false));
+        
+        // Restaurar flag de cambios
+        boolean fileChanged = savedState.getBoolean(STATE_FILE_CHANGED, false);
+        fileManager.setFileChanged(fileChanged);
+        if (fileChanged && fileName != null) {
+            uiManager.showChangeDetected(fileName);
+        }
+        
+        // Restaurar última compilación
+        String lastSoPath = savedState.getString(STATE_LAST_SO_PATH);
+        if (lastSoPath != null) {
+            String lastSoName = savedState.getString(STATE_LAST_SO_NAME);
+            boolean lastIsTemporary = savedState.getBoolean(STATE_LAST_IS_TEMPORARY, true);
+            compilationManager.setLastCompilation(lastSoPath, lastSoName, lastIsTemporary);
+        }
+        
+        // Habilitar el editor si hay archivo cargado
+        if (fileUriString != null) {
+            codeEditor.setEnabled(true);
+            
+            // Reiniciar monitoreo del archivo
+            startFileMonitoring();
+        }
     }
 
     private void initializeComponents() {
@@ -203,39 +332,50 @@ public class CompilerActivity extends Activity {
         
         Uri selectedUri = fileManager.getSelectedSourceUri();
         if (selectedUri != null) {
-            uiManager.showLoadingIndicator(true);
-            
-            fileManager.reloadFromStorage(new FileManager.FileLoadCallback() {
-                @Override
-                public void onFileLoaded(File file, String content) {
-                    uiManager.showLoadingIndicator(false);
-                    codeEditor.setText(content);
-                    codeEditor.setEnabled(true);
-                    uiManager.updateFileName(file.getName());
-                    compilationManager.reset();
-                    executeButton.setEnabled(false);
-                    saveButton.setEnabled(true);
-                    
-                    startFileMonitoring();
-                    
-                    Toast.makeText(CompilerActivity.this, 
-                        "✓ Archivo sincronizado", Toast.LENGTH_SHORT).show();
-                }
+            // Solo recargar si no venimos de una rotación
+            // (el estado ya fue restaurado en onCreate)
+            if (!isChangingConfigurations()) {
+                uiManager.showLoadingIndicator(true);
+                
+                fileManager.reloadFromStorage(new FileManager.FileLoadCallback() {
+                    @Override
+                    public void onFileLoaded(File file, String content) {
+                        uiManager.showLoadingIndicator(false);
+                        codeEditor.setText(content);
+                        codeEditor.setEnabled(true);
+                        uiManager.updateFileName(file.getName());
+                        compilationManager.reset();
+                        executeButton.setEnabled(false);
+                        saveButton.setEnabled(true);
+                        
+                        startFileMonitoring();
+                        
+                        Toast.makeText(CompilerActivity.this, 
+                            "✓ Archivo sincronizado", Toast.LENGTH_SHORT).show();
+                    }
 
-                @Override
-                public void onFileLoadError(String error) {
-                    uiManager.showLoadingIndicator(false);
-                    Toast.makeText(CompilerActivity.this, 
-                        "✗ Error: " + error, Toast.LENGTH_SHORT).show();
-                }
-            });
+                    @Override
+                    public void onFileLoadError(String error) {
+                        uiManager.showLoadingIndicator(false);
+                        Toast.makeText(CompilerActivity.this, 
+                            "✗ Error: " + error, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } else {
+                // Solo reiniciar el monitoreo después de rotación
+                startFileMonitoring();
+            }
         }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        fileChangeDetector.stopMonitoring();
+        
+        // Solo detener el monitoreo si no es un cambio de configuración
+        if (!isChangingConfigurations()) {
+            fileChangeDetector.stopMonitoring();
+        }
         
         // Guardar cambios del editor automáticamente
         if (fileManager.getSelectedSourceFile() != null) {
@@ -246,8 +386,11 @@ public class CompilerActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        fileChangeDetector.stopMonitoring();
-        fileManager.cleanup();
+        // Solo limpiar si no es un cambio de configuración
+        if (!isChangingConfigurations()) {
+            fileChangeDetector.stopMonitoring();
+            fileManager.cleanup();
+        }
         super.onDestroy();
     }
 

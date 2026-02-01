@@ -128,4 +128,21 @@ public class CompilationManager {
         lastCompiledSoName = null;
         lastWasExternal = false;
     }
+
+    // Getters para restaurar estado
+    public boolean hasLastCompilation() {
+        return lastCompiledSoPath != null;
+    }
+
+    public String getLastSoPath() {
+        return lastCompiledSoPath;
+    }
+
+    public String getLastSoName() {
+        return lastCompiledSoName;
+    }
+
+    public boolean isLastTemporary() {
+        return lastWasExternal;
+    }
 }
