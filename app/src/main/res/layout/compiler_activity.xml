@@ -1,218 +1,182 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
+    android:orientation="vertical"
     android:background="#F5F5F5">
 
+    <!-- Barra de herramientas superior -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:background="#FFFFFF"
+        android:padding="1dp"
+        android:elevation="0dp">
 
-        <TextView
-            android:layout_width="match_parent"
+        <Button
+            android:id="@+id/select_file_button"
+            android:layout_width="50dp"
             android:layout_height="wrap_content"
-            android:text="Compilador Nativo JNI"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:paddingBottom="8dp"
-            android:textColor="#212121" />
+            android:text="📁"
+            android:textSize="20sp"
+            android:padding="2dp"
+            android:layout_marginEnd="0dp" />
 
-        <TextView
-            android:layout_width="match_parent"
+        <Button
+            android:id="@+id/save_button"
+            android:layout_width="50dp"
             android:layout_height="wrap_content"
-            android:text="Compila archivos .c a bibliotecas .so nativas para Android"
-            android:textSize="14sp"
-            android:paddingBottom="16dp"
-            android:textColor="#757575" />
+            android:text="💾"
+            android:textSize="20sp"
+            android:padding="2dp"
+            android:layout_marginEnd="0dp"
+            android:enabled="false" />
 
-        <!-- Indicador de estado de cambios -->
-        <TextView
-            android:id="@+id/change_status_text"
-            android:layout_width="match_parent"
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/compile_button"
+            android:layout_width="50dp"
             android:layout_height="wrap_content"
-            android:text="CAMBIOS DETECTADOS"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:padding="12dp"
-            android:background="#FFF3E0"
-            android:textColor="#FF9800"
-            android:visibility="gone"
-            android:layout_marginBottom="16dp" />
+            android:text="⚙️"
+            android:textSize="20sp"
+            android:padding="2dp"
+            android:layout_marginEnd="0dp"
+            android:enabled="false" />
 
-        <!-- Sección de selección de archivo -->
-        <LinearLayout
-            android:layout_width="match_parent"
+        <Button
+            android:id="@+id/execute_button"
+            android:layout_width="50dp"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="#FFFFFF"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp"
-            android:elevation="2dp">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="1. Seleccionar archivo fuente"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:paddingBottom="12dp"
-                android:textColor="#212121" />
-
-            <Button
-                android:id="@+id/select_file_button"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="SELECCIONAR ARCHIVO .C"
-                android:textSize="14sp"
-                android:padding="12dp" />
-
-            <TextView
-                android:id="@+id/selected_file_text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Ningún archivo seleccionado"
-                android:textSize="13sp"
-                android:paddingTop="12dp"
-                android:textColor="#757575"
-                android:fontFamily="monospace" />
-
-        </LinearLayout>
-
-        <!-- Sección de compilación -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="#FFFFFF"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp"
-            android:elevation="2dp">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="2. Configurar y Compilar"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:paddingBottom="12dp"
-                android:textColor="#212121" />
-
-            <CheckBox
-                android:id="@+id/save_external_checkbox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Guardar en almacenamiento externo (/mis_so/)"
-                android:textSize="14sp"
-                android:paddingBottom="12dp" />
-
-            <Button
-                android:id="@+id/compile_button"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="COMPILAR A .SO"
-                android:textSize="16sp"
-                android:padding="14dp"
-                android:enabled="false" />
-
-            <ProgressBar
-                android:id="@+id/compile_progress_bar"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:indeterminate="true"
-                android:layout_marginTop="12dp"
-                android:visibility="gone" />
-
-        </LinearLayout>
-
-        <!-- Sección de ejecución -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="#FFFFFF"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp"
-            android:elevation="2dp">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="3. Ejecutar Motor Gráfico"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:paddingBottom="12dp"
-                android:textColor="#212121" />
-
-            <Button
-                android:id="@+id/execute_button"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="▶ EJECUTAR MOTOR GRÁFICO"
-                android:textSize="16sp"
-                android:padding="14dp"
-                android:enabled="false"
-                android:backgroundTint="#4CAF50" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="El motor gráfico se ejecutará en una nueva pantalla con renderizado EGL/OpenGL"
-                android:textSize="12sp"
-                android:paddingTop="8dp"
-                android:textColor="#757575" />
-
-        </LinearLayout>
-
-        <!-- Sección de salida -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="#FFFFFF"
-            android:padding="16dp"
-            android:elevation="2dp">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="4. Resultado"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:paddingBottom="12dp"
-                android:textColor="#212121" />
-
-            <ScrollView
-                android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:background="#263238"
-                android:padding="12dp">
-
-                <TextView
-                    android:id="@+id/output_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Esperando compilación..."
-                    android:textSize="12sp"
-                    android:fontFamily="monospace"
-                    android:textColor="#B0BEC5"
-                    android:lineSpacingExtra="2dp" />
-
-            </ScrollView>
-
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="💡 Tip: Los cambios se detectan automáticamente. La librería se carga en un proceso separado que se limpia al salir."
-            android:textSize="12sp"
-            android:paddingTop="16dp"
-            android:textColor="#757575"
-            android:textStyle="italic" />
+            android:text="▶️"
+            android:textSize="20sp"
+            android:padding="2dp"
+            android:enabled="false"
+             />
 
     </LinearLayout>
 
-</ScrollView>
+    <!-- Indicador de carga -->
+    <ProgressBar
+        android:id="@+id/loading_indicator"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <!-- Indicador de cambios -->
+    <TextView
+        android:id="@+id/change_status_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="CAMBIOS DETECTADOS"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:padding="8dp"
+        android:background="#FFF3E0"
+        android:textColor="#FF9800"
+        android:visibility="gone" />
+
+    <!-- Checkbox para almacenamiento externo -->
+    <CheckBox
+        android:id="@+id/save_external_checkbox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Guardar .so en /mis_so/"
+        android:textSize="12sp"
+        android:padding="8dp"
+        android:background="#FFFFFF" />
+
+    <!-- TabHost -->
+    <TabHost
+        android:id="@+id/tabHost"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- Tabs -->
+            
+
+            <!-- Tab Content -->
+            <FrameLayout
+                android:id="@android:id/tabcontent"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <!-- Tab 1: Editor -->
+                <ScrollView
+                    android:id="@+id/tab_editor"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#263238">
+
+                    <EditText
+                        android:id="@+id/code_editor"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="12dp"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#757575"
+                        android:hint="#include &lt;stdio.h&gt;\n\nint main() {\n    return 0;\n}"
+                        android:gravity="top|start"
+                        android:inputType="textMultiLine|textNoSuggestions"
+                        android:background="#263238"
+                        android:minLines="20"
+                        android:scrollbars="vertical" />
+
+                </ScrollView>
+
+                <!-- Tab 2: Console -->
+                <ScrollView
+                    android:id="@+id/tab_console"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#263238"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:id="@+id/console_output"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Esperando compilación..."
+                        android:textSize="12sp"
+                        android:fontFamily="monospace"
+                        android:textColor="#B0BEC5" />
+
+                </ScrollView>
+
+            </FrameLayout>
+
+            <TabWidget
+                android:id="@android:id/tabs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#FFFFFF" />
+
+        </LinearLayout>
+
+    </TabHost>
+
+    <!-- Progress Bar de compilación -->
+    <ProgressBar
+        android:id="@+id/compile_progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+</LinearLayout>
