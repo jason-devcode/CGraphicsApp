@@ -13,7 +13,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.util.Log;
 import android.widget.TabHost;
-import android.widget.EditText;
 
 import java.io.File;
 
@@ -39,7 +38,7 @@ public class CompilerActivity extends Activity {
 
     // UI Components
     private TabHost tabHost;
-    private EditText codeEditor;
+    private CodeEditorView codeEditor;  // Cambiado de EditText a CodeEditorView
     private TextView consoleOutput;
     private TextView changeStatusText;
     private Button selectFileButton;
@@ -76,7 +75,7 @@ public class CompilerActivity extends Activity {
         super.onSaveInstanceState(outState);
         
         // Guardar texto del editor
-        outState.putString(STATE_EDITOR_TEXT, codeEditor.getText().toString());
+        outState.putString(STATE_EDITOR_TEXT, codeEditor.getText());
         
         // Guardar texto de consola
         outState.putString(STATE_CONSOLE_TEXT, consoleOutput.getText().toString());
@@ -195,7 +194,7 @@ public class CompilerActivity extends Activity {
         // Tab 1: Editor
         TabHost.TabSpec editorTab = tabHost.newTabSpec("editor");
         editorTab.setIndicator("file.c");
-        editorTab.setContent(R.id.tab_editor);
+        editorTab.setContent(R.id.code_editor);
         tabHost.addTab(editorTab);
 
         // Tab 2: Console
@@ -205,7 +204,7 @@ public class CompilerActivity extends Activity {
         tabHost.addTab(consoleTab);
 
         // UI Elements
-        codeEditor = findViewById(R.id.code_editor);
+        codeEditor = findViewById(R.id.code_editor);  // Ahora es CodeEditorView
         consoleOutput = findViewById(R.id.console_output);
         changeStatusText = findViewById(R.id.change_status_text);
         selectFileButton = findViewById(R.id.select_file_button);
@@ -220,6 +219,10 @@ public class CompilerActivity extends Activity {
         executeButton.setEnabled(false);
         saveButton.setEnabled(false);
 
+        // Configurar el editor de código
+        codeEditor.setHint("#include <stdio.h>\n\nint main() {\n    return 0;\n}");
+        
+        // Actualizar UIManager para usar CodeEditorView
         uiManager.setUIComponents(codeEditor, consoleOutput, changeStatusText, 
             compileButton, executeButton, saveButton, progressBar, loadingIndicator, tabHost);
     }
@@ -288,7 +291,7 @@ public class CompilerActivity extends Activity {
     }
 
     private void saveCurrentFile() {
-        String content = codeEditor.getText().toString();
+        String content = codeEditor.getText();
         
         uiManager.showSavingIndicator(true);
         
@@ -320,7 +323,7 @@ public class CompilerActivity extends Activity {
         File sourceFile = fileManager.getSelectedSourceFile();
         if (sourceFile != null && sourceFile.exists()) {
             String content = fileManager.readFileContent(sourceFile);
-            if (content != null && !content.equals(codeEditor.getText().toString())) {
+            if (content != null && !content.equals(codeEditor.getText())) {
                 codeEditor.setText(content);
             }
         }
@@ -379,7 +382,7 @@ public class CompilerActivity extends Activity {
         
         // Guardar cambios del editor automáticamente
         if (fileManager.getSelectedSourceFile() != null) {
-            String content = codeEditor.getText().toString();
+            String content = codeEditor.getText();
             fileManager.saveContentToFile(fileManager.getSelectedSourceFile(), content);
         }
     }
